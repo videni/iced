@@ -224,6 +224,21 @@ where
     ) -> layout::Node {
         let limits = limits.max_width(self.max_width);
 
+        // dbg!(&limits, layout::flex::resolve(
+        //     layout::flex::Axis::Vertical,
+        //     renderer,
+        //     &limits,
+        //     self.width,
+        //     self.height,
+        //     self.padding,
+        //     self.spacing,
+        //     self.align,
+        //     &self.children,
+        //     &mut tree.children,
+        // ));
+
+        // std::process::exit(1);
+        
         layout::flex::resolve(
             layout::flex::Axis::Vertical,
             renderer,

@@ -120,6 +120,7 @@ where
             "scrollable content must not fill its vertical scrolling axis"
         );
 
+        // 不是horizontal scroll, 且宽度是 shrink 或fixed。
         debug_assert!(
             self.direction.horizontal().is_none() || !size_hint.width.is_fill(),
             "scrollable content must not fill its horizontal scrolling axis"

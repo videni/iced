@@ -30,7 +30,7 @@ impl Tiger {
             env!("CARGO_MANIFEST_DIR")
         ));
 
-        let svg =
+        let svg: svg::Svg =
             svg(handle)
                 .width(Fill)
                 .height(Fill)

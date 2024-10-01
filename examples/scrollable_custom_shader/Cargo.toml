@@ -9,3 +9,4 @@ iced.workspace = true
 iced.features = ["debug", "advanced"]
 
 image.workspace = true
+bytemuck.workspace = true

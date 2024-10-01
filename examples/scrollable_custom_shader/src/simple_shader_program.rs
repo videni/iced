@@ -1,9 +1,8 @@
 use iced::mouse;
 use iced::{Rectangle, Size};
-
 use crate::wgpu;
-
 use iced::widget::shader::{self, Viewport};
+use iced::widget::shader::wgpu::util::DeviceExt;
 
 pub struct SimpleShaderProgram
 {
@@ -72,6 +71,8 @@ impl shader::Primitive for SimpleShaderProgramPrimitive
 struct Pipeline {
     bind_group: wgpu::BindGroup,
     render_pipeline: wgpu::RenderPipeline,
+    index_buffer: wgpu::Buffer,
+    vertex_buffer: wgpu::Buffer
 }
 
 impl Pipeline {
@@ -124,7 +125,7 @@ impl Pipeline {
                 depth_or_array_layers: 1,
             }
         );
-
+        
         let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
@@ -137,6 +138,51 @@ impl Pipeline {
             mipmap_filter: wgpu::FilterMode::Nearest,
             ..Default::default()
         });
+
+        // Vertex data for a quad (4 vertices)
+        let vertices: [Vertex; 4] = [
+            Vertex::new([-1.0, -1.0], [0.0, 1.0]), // bottom-left
+            Vertex::new([1.0, -1.0], [1.0, 1.0]),  // bottom-right
+            Vertex::new([1.0, 1.0], [1.0, 0.0]),   // top-right
+            Vertex::new([-1.0, 1.0], [0.0, 0.0]),  // top-left
+        ];
+
+        // Create a vertex buffer
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(&vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
+        // Index data (6 indices for 2 triangles forming a quad)
+        let indices: [u16; 6] = [
+            0, 1, 2,  // First triangle (bottom-left, bottom-right, top-right)
+            0, 2, 3,  // Second triangle (bottom-left, top-right, top-left)
+        ];
+
+        // Create an index buffer
+        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Index Buffer"),
+            contents: bytemuck::cast_slice(&indices),
+            usage: wgpu::BufferUsages::INDEX,
+        });
+
+        let vertex_buffer_layout = wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 0, // Corresponds to `@location(0)` in the vertex shader
+                    format: wgpu::VertexFormat::Float32x2, // 2D position
+                },
+                wgpu::VertexAttribute {
+                    offset: std::mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
+                    shader_location: 1, // Corresponds to `@location(1)` in the vertex shader
+                    format: wgpu::VertexFormat::Float32x2, // 2D texture coordinates
+                },
+            ],
+        };
 
         // Create the bind group layout
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -196,7 +242,7 @@ impl Pipeline {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &[], // Define your vertex buffer here
+                buffers: &[vertex_buffer_layout], // Define your vertex buffer here
                 compilation_options:  wgpu::PipelineCompilationOptions::default()
             },
             fragment: Some(wgpu::FragmentState {
@@ -221,7 +267,9 @@ impl Pipeline {
 
         Self {
             render_pipeline,
-            bind_group
+            bind_group,
+            index_buffer,
+            vertex_buffer
         }
     }
 
@@ -248,41 +296,31 @@ impl Pipeline {
             });
 
             render_pass.set_scissor_rect(clip_bounds.x, clip_bounds.y, clip_bounds.width, clip_bounds.height);
+
+            // Set the vertex buffer and index buffer
+            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+
             // Set the pipeline and bind group
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.bind_group, &[]);
 
-            // Draw the quad (4 vertices)
-            render_pass.draw(0..4, 0..1);
+            // Draw indexed: 6 indices (two triangles), 1 instance
+            render_pass.draw_indexed(0..6, 0, 0..1);
         }
     }
 }
 
-#[derive(Debug)]
-struct TargetTexture {
-    view: wgpu::TextureView,
-    width: u32,
-    height: u32,
+
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct Vertex {
+    position: [f32; 2],
+    tex_coords: [f32; 2],
 }
 
-impl TargetTexture {
-    pub fn new(device: &wgpu::Device, width: u32, height: u32) -> Self {
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: None,
-            size: wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            view_formats: &[wgpu::TextureFormat::Rgba8UnormSrgb],
-        });
-        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-        Self { view, width, height }
+impl Vertex {
+    fn new(position: [f32; 2], tex_coords: [f32; 2]) -> Self {
+        Self { position, tex_coords }
     }
 }

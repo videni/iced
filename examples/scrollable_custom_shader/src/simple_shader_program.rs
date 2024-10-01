@@ -6,6 +6,7 @@ use iced::widget::shader::wgpu::util::DeviceExt;
 
 pub struct SimpleShaderProgram
 {
+    pub image: String,
 }
 
 #[derive(Default)]
@@ -19,13 +20,16 @@ impl<Message> shader::Program<Message> for SimpleShaderProgram
     type Primitive = SimpleShaderProgramPrimitive;
 
     fn draw(&self, _state: &Self::State, _cursor: mouse::Cursor, _bounds: Rectangle) -> Self::Primitive {
-        SimpleShaderProgramPrimitive {}
+        SimpleShaderProgramPrimitive {
+            image: self.image.clone(),
+        }
     }
 }
 
 #[derive(Debug)]
 pub struct SimpleShaderProgramPrimitive
 {
+    image: String,
 }
 
 
@@ -48,7 +52,7 @@ impl shader::Primitive for SimpleShaderProgramPrimitive
         let pipeline = storage.get_mut::<Pipeline>().unwrap();
 
         // Upload data to GPU
-        pipeline.update(device, queue);
+        pipeline.update(device, queue, self.image.as_str());
     }
 
     fn render(
@@ -69,7 +73,8 @@ impl shader::Primitive for SimpleShaderProgramPrimitive
 
 
 struct Pipeline {
-    bind_group: wgpu::BindGroup,
+    bind_group_layout: wgpu::BindGroupLayout,
+    bind_group: Option<wgpu::BindGroup>,
     render_pipeline: wgpu::RenderPipeline,
     index_buffer: wgpu::Buffer,
     vertex_buffer: wgpu::Buffer
@@ -77,68 +82,6 @@ struct Pipeline {
 
 impl Pipeline {
     fn new(device: &wgpu::Device, queue: &wgpu::Queue, _format: wgpu::TextureFormat) -> Self {
-        use image::GenericImageView;
-
-        let image_data = image::open(format!(
-            "{}/resources/tiger.png",
-            env!("CARGO_MANIFEST_DIR")
-        )).unwrap();
-
-        let (width, height) = image_data.dimensions();
-        let rgba_image = image_data.to_rgba8();
-        let raw_data = rgba_image.into_raw();
-
-        // Create the wgpu texture
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Image Texture"),
-            size: wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING
-                | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
-        });
-
-        // Copy the pixel data into the texture
-        queue.write_texture(
-            wgpu::ImageCopyTexture {
-                texture: &texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            &raw_data,
-            wgpu::ImageDataLayout {
-                offset: 0,
-                bytes_per_row: Some(4 * width),
-                rows_per_image: Some(height),
-            },
-            wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            }
-        );
-        
-        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("Texture Sampler"),
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            ..Default::default()
-        });
-
         // Vertex data for a quad (4 vertices)
         let vertices: [Vertex; 4] = [
             Vertex::new([-1.0, -1.0], [0.0, 1.0]), // bottom-left
@@ -207,22 +150,6 @@ impl Pipeline {
             ],
         });
 
-        // Create the bind group
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&texture_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&sampler),
-                },
-            ],
-            label: Some("Bind Group"),
-        });
-        
         // Create the render pipeline
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("A Shader"),
@@ -267,47 +194,126 @@ impl Pipeline {
 
         Self {
             render_pipeline,
-            bind_group,
+            bind_group_layout,
             index_buffer,
-            vertex_buffer
+            vertex_buffer,
+            bind_group: None,
         }
     }
 
-    pub fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
-      
+    pub fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, image: &str) {
+        use image::GenericImageView;
+
+        // Load the image data in to texture
+        let image_data = image::open(format!(
+            "{}/resources/{}.png",
+            env!("CARGO_MANIFEST_DIR"),
+            image
+        )).unwrap();
+
+        let (width, height) = image_data.dimensions();
+        let rgba_image = image_data.to_rgba8();
+        let raw_data = rgba_image.into_raw();
+
+        // Create the wgpu texture
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Image Texture"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+
+        // Copy the pixel data into the texture
+        queue.write_texture(
+            wgpu::ImageCopyTexture {
+                texture: &texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            &raw_data,
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some(4 * width),
+                rows_per_image: Some(height),
+            },
+            wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            }
+        );
+        
+        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Texture Sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
+
+        // Create the bind group
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &self.bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+            label: Some("Bind Group"),
+        });
+
+        self.bind_group = Some(bind_group);
     }
 
     pub fn render(&self, encoder: &mut wgpu::CommandEncoder, iced_target: &wgpu::TextureView, clip_bounds: &Rectangle<u32>) {
         // Begin a new render pass
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: iced_target,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                label: Some("Render Pass"),
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: iced_target,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            label: Some("Render Pass"),
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
 
-            render_pass.set_scissor_rect(clip_bounds.x, clip_bounds.y, clip_bounds.width, clip_bounds.height);
+        render_pass.set_scissor_rect(clip_bounds.x, clip_bounds.y, clip_bounds.width, clip_bounds.height);
 
-            // Set the vertex buffer and index buffer
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        // Set the vertex buffer and index buffer
+        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
-            // Set the pipeline and bind group
-            render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, &self.bind_group, &[]);
+        // Set the pipeline and bind group
+        render_pass.set_pipeline(&self.render_pipeline);
+        render_pass.set_bind_group(0, self.bind_group.as_ref().unwrap(), &[]);
 
-            // Draw indexed: 6 indices (two triangles), 1 instance
-            render_pass.draw_indexed(0..6, 0, 0..1);
-        }
+        // Draw indexed: 6 indices (two triangles), 1 instance
+        render_pass.draw_indexed(0..6, 0, 0..1);
     }
 }
 

@@ -120,7 +120,6 @@ where
             "scrollable content must not fill its vertical scrolling axis"
         );
 
-        // 不是horizontal scroll, 且宽度是 shrink 或fixed。
         debug_assert!(
             self.direction.horizontal().is_none() || !size_hint.width.is_fill(),
             "scrollable content must not fill its horizontal scrolling axis"
@@ -420,6 +419,7 @@ where
         renderer: &Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
+        // dbg!(limits);std::process::exit(1);
         let (right_padding, bottom_padding) = match self.direction {
             Direction::Vertical(Scrollbar {
                 width,
@@ -436,7 +436,7 @@ where
             _ => (0.0, 0.0),
         };
 
-        layout::padded(
+        let t = layout::padded(
             limits,
             self.width,
             self.height,
@@ -462,13 +462,24 @@ where
                     ),
                 );
 
-                self.content.as_widget().layout(
+               let t = self.content.as_widget().layout(
                     &mut tree.children[0],
                     renderer,
                     &child_limits,
-                )
+                );
+
+                // dbg!( &t);
+
+                t
+
             },
-        )
+        );
+
+        // dbg!(&t);
+    // std::process::exit(1);
+
+        t
+        
     }
 
     fn operate(
@@ -519,12 +530,19 @@ where
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
     ) -> event::Status {
+
+        // dbg!(layout);
+        // std::process::exit(1);
+
         let state = tree.state.downcast_mut::<State>();
         let bounds = layout.bounds();
         let cursor_over_scrollable = cursor.position_over(bounds);
 
         let content = layout.children().next().unwrap();
         let content_bounds = content.bounds();
+
+        // dbg!(content_bounds);
+        // std::process::exit(1);
 
         let scrollbars =
             Scrollbars::new(state, self.direction, bounds, content_bounds);
@@ -945,6 +963,7 @@ where
 
         container::draw_background(renderer, &style.container, layout.bounds());
 
+        // std::process::exit(1);
         // Draw inner content
         if scrollbars.active() {
             renderer.with_layer(visible_bounds, |renderer| {
@@ -1429,6 +1448,7 @@ impl State {
         content_bounds: Rectangle,
     ) {
         if bounds.height < content_bounds.height {
+            // offset_y 的移动距离只能在 scrollable 的 height 与它的子控件的 height 之间的距离。
             self.offset_y = Offset::Absolute(
                 (self.offset_y.absolute(bounds.height, content_bounds.height)
                     + delta.y)

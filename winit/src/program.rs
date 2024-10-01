@@ -722,6 +722,7 @@ async fn run_instance<P, C>(
                     exit_on_close_request,
                 );
 
+                // dbg!(&window.state);
                 let logical_size = window.state.logical_size();
 
                 let _ = user_interfaces.insert(

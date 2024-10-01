@@ -283,6 +283,7 @@ where
 
         let state = tree.state.downcast_ref::<P::State>();
 
+        // dbg!(Vector::new(bounds.x, bounds.y));
         renderer.with_translation(
             Vector::new(bounds.x, bounds.y),
             |renderer| {

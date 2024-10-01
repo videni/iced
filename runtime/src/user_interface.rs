@@ -95,6 +95,11 @@ where
         let Cache { mut state } = cache;
         state.diff(root.as_widget());
 
+          fn type_name_of<T>(_: &T) -> &'static str {
+        std::any::type_name::<T>()
+        }
+
+        // dbg!(type_name_of(&root));
         let base = root.as_widget().layout(
             &mut state,
             renderer,

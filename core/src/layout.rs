@@ -183,6 +183,8 @@ pub fn positioned(
         .shrink(padding)
         .resolve(width, height, content.size());
 
+    // dbg!(limits, content.size(), size, width, height, padding);
+
     Node::with_children(
         size.expand(padding),
         vec![position(content.move_to((padding.left, padding.top)), size)],

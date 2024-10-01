@@ -72,6 +72,14 @@ enum Task {
     },
 }
 
+use std::sync::atomic::AtomicUsize;
+
+static COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+fn increment_counter() {
+    let _ = COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+}
+
 impl State {
     fn recompute(&mut self, size: usize) {
         let mut offsets = Vec::with_capacity(size + 1);
@@ -121,6 +129,11 @@ where
         renderer: &Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
+        // increment_counter();
+        // if COUNTER.load(std::sync::atomic::Ordering::SeqCst) == 2 {
+        //     panic!("second time rendering");
+        // }
+
         let state = tree.state.downcast_mut::<State>();
         let loose_limits = limits.loose();
 
@@ -131,11 +144,12 @@ where
         }
 
         let mut changes = self.content.changes.borrow_mut();
-        dbg!(&changes, &state.task);
 
         match state.task {
             Task::Idle => {
                 while let Some(change) = changes.pop_front() {
+                    panic!("hi");
+
                     match change {
                         // original 与 current 的关系是什么？
                         Change::Updated { original, current } => {
@@ -270,7 +284,7 @@ where
                             );
 
                             let size = layout.size();
-
+                          
                             state.widths.push(size.width);
                             state.offsets.push(
                                 state.offsets.last().unwrap() + size.height,
@@ -327,7 +341,8 @@ where
                     let layout = element
                         .as_widget()
                         .layout(&mut tree, renderer, &state.last_limits)
-                        .move_to((0.0, accumulated_height));
+                        // .move_to((0.0, accumulated_height))
+                        ;
 
                     let bounds = layout.bounds();
 
@@ -360,6 +375,8 @@ where
         let size =
             limits.resolve(Length::Shrink, Length::Shrink, intrinsic_size);
 
+        dbg!(&COUNTER, size);
+
         layout::Node::new(size)
     }
 
@@ -375,16 +392,16 @@ where
         viewport: &Rectangle,
     ) -> event::Status {
         let state = tree.state.downcast_mut::<State>();
-        // 该 widget y到左上角的距离。
         let offset = layout.position() - Point::ORIGIN;
 
-        dbg!(layout, viewport);
+        // dbg!(layout, viewport);
 
         let status = self
             .visible_elements
             .iter_mut()
             .zip(&mut state.visible_layouts)
             .map(|(element, (index, layout, tree))| {
+                // dbg!(*index, &layout);
                 element.as_widget_mut().on_event(
                     tree,
                     event.clone(),
@@ -415,10 +432,11 @@ where
             // viewport 是哪个 widget 的大小？ 我猜测是， list 所在整个空间的大小。list的大小是 shrink， 
             // 所以 viewport 是list能够拥有的最大空间。
 
+            // dbg!(offset, offsets, viewport, layout, viewport.y - offset.y);
+
             let start =
                 match binary_search_with_index_by(offsets, |i, height| {
                     (*height + i.saturating_sub(1) as f32 * self.spacing)
-                        //  遍历每个 offset， 选择 layout 的
                         .partial_cmp(&(viewport.y - offset.y))
                         .unwrap_or(Ordering::Equal)
                 }) {
@@ -437,7 +455,6 @@ where
             }
             .min(self.content.len());
 
-            // 为什么？
             if state.visible_outdated
                 || state.visible_layouts.len() != self.visible_elements.len()
             {
@@ -556,12 +573,15 @@ where
         cursor: mouse::Cursor,
         viewport: &Rectangle,
     ) {
+        // dbg!(viewport);
+        // std::process::exit(1);
         let state = tree.state.downcast_ref::<State>();
         let offset = layout.position() - Point::ORIGIN;
 
         for (element, (_item, layout, tree)) in
             self.visible_elements.iter().zip(&state.visible_layouts)
         {
+
             element.as_widget().draw(
                 tree,
                 renderer,

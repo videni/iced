@@ -39,31 +39,34 @@ impl List {
     }
 
     fn view(&self) -> Element<Message> {
+        // return center(square(400, 100)).into();
+
         center(
             scrollable(
                 list(&self.content, |index, (id, state)| {
                     row![
-                        match state {
-                            State::Idle =>
-                                Element::from(text(format!("I am item {id}!"))),
-                            State::Updated => center(
-                                column![
-                                    text(format!("I am item {id}!")),
-                                    text("... but different!")
-                                ]
-                                .spacing(20)
-                            )
-                            .height(300)
-                            .into(),
-                        },
-                        horizontal_space(),
-                        button("Update").on_press_maybe(
-                            matches!(state, State::Idle)
-                                .then_some(Message::Update(index))
-                        ),
-                        button("Remove")
-                            .on_press(Message::Remove(index))
-                            .style(button::danger)
+                        square(400, index as u32),
+                        // match state {
+                        //     State::Idle =>
+                        //         Element::from(text(format!("I am item {id}!"))),
+                        //     State::Updated => center(
+                        //         column![
+                        //             text(format!("I am item {id}!")),
+                        //             text("... but different!")
+                        //         ]
+                        //         .spacing(20)
+                        //     )
+                        //     .height(300)
+                        //     .into(),
+                        // },
+                        // horizontal_space(),
+                        // button("Update").on_press_maybe(
+                        //     matches!(state, State::Idle)
+                        //         .then_some(Message::Update(index))
+                        // ),
+                        // button("Remove")
+                        //     .on_press(Message::Remove(index))
+                        //     .style(button::danger)
                     ]
                     .spacing(10)
                     .padding(5)
@@ -85,7 +88,7 @@ impl Default for List {
     fn default() -> Self {
         Self {
             content: list::Content::from_iter(
-                (0..1000).map(|id| (id, State::Idle)),
+                (0..3).map(|id| (id, State::Idle)),
             ),
         }
     }

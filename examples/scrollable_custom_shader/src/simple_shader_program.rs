@@ -49,14 +49,13 @@ impl shader::Primitive for SimpleShaderProgramPrimitive
         bounds: &Rectangle,
         viewport: &Viewport,
     ) {
-        dbg!(bounds);
         if !storage.has::<Pipeline>() {
             storage.store(Pipeline::new(device, queue, format));
         }
 
         let pipeline = storage.get_mut::<Pipeline>().unwrap();
 
-        let position = bounds.position() * viewport.projection();
+        let position = (*bounds) * (viewport.scale_factor() as f32) * viewport.projection();
 
         // Upload data to GPU
         pipeline.update(device, queue, self.image.as_str(), position);
@@ -183,7 +182,7 @@ impl Pipeline {
         }
     }
 
-    pub fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, image: &str, position: Point) {
+    pub fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, image: &str, position: Rectangle) {
         use image::GenericImageView;
 
         // Load the image data in to texture
@@ -264,14 +263,17 @@ impl Pipeline {
             label: Some("Bind Group"),
         });
 
-        dbg!(&position);
+        let top_left = [position.x, position.y];
+        let top_right = [position.x + position.width, position.y];
+        let bottom_left = [position.x, position.y + position.height];
+        let bottom_right = [position.x + position.width, position.y + position.height];
 
          // Vertex data for a quad (4 vertices)
          let vertices: [Vertex; 4] = [
-            Vertex::new([-1.0 , -1.0 + position.y] , [0.0, 1.0]), // bottom-left
-            Vertex::new([1.0 , -1.0 + position.y], [1.0, 1.0]),  // bottom-right
-            Vertex::new([1.0 , 1.0 + position.y], [1.0, 0.0]),   // top-right
-            Vertex::new([-1.0 , 1.0 + position.y], [0.0, 0.0]),  // top-left
+            Vertex::new(bottom_left , [0.0, 1.0]), // bottom-left
+            Vertex::new(bottom_right, [1.0, 1.0]),  // bottom-right
+            Vertex::new(top_right, [1.0, 0.0]),   // top-right
+            Vertex::new(top_left, [0.0, 0.0]),  // top-left
         ];
 
         // Create a vertex buffer
@@ -333,7 +335,7 @@ impl Pipeline {
 
 
 #[repr(C)]
-#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Debug)]
 struct Vertex {
     position: [f32; 2],
     tex_coords: [f32; 2],

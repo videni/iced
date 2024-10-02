@@ -10,3 +10,4 @@ iced.features = ["debug", "advanced"]
 
 image.workspace = true
 bytemuck.workspace = true
+glam.workspace = true

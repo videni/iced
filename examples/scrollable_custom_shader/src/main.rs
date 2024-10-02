@@ -35,12 +35,12 @@ impl Application {
         let t0 = Element::from(
             shader(SimpleShaderProgram {image: "ice_cube_normal_map".to_owned()})
                 .width(800)
-                .height(1000),
+                .height(800),
         );
         let t1 = Element::from(
             shader(SimpleShaderProgram {image: "tiger".to_owned()})
                 .width(800)
-                .height(1000),
+                .height(800),
         );
         // let t2 = Element::from(
         //     shader(SimpleShaderProgram {image: "ice_cube_normal_map".to_owned()})

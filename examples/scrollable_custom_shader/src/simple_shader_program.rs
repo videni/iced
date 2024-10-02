@@ -318,7 +318,7 @@ impl Pipeline {
             occlusion_query_set: None,
         });
 
-        // render_pass.set_scissor_rect(clip_bounds.x, clip_bounds.y, clip_bounds.width, clip_bounds.height);
+        render_pass.set_scissor_rect(clip_bounds.x, clip_bounds.y, clip_bounds.width, clip_bounds.height);
 
         // Set the vertex buffer and index buffer
         render_pass.set_vertex_buffer(0, self.vertex_buffer.as_ref().unwrap().slice(..));

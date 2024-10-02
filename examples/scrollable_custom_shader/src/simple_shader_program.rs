@@ -1,4 +1,4 @@
-use iced::mouse;
+use iced::{mouse, Point, Transformation};
 use iced::{Rectangle, Size};
 use crate::wgpu;
 use iced::widget::shader::{self, Viewport};
@@ -19,7 +19,7 @@ impl<Message> shader::Program<Message> for SimpleShaderProgram
     type State = State;
     type Primitive = SimpleShaderProgramPrimitive;
 
-    fn draw(&self, _state: &Self::State, _cursor: mouse::Cursor, _bounds: Rectangle) -> Self::Primitive {
+    fn draw(&self, _state: &Self::State, _cursor: mouse::Cursor, bounds: Rectangle) -> Self::Primitive {
         SimpleShaderProgramPrimitive {
             image: self.image.clone(),
         }
@@ -32,6 +32,11 @@ pub struct SimpleShaderProgramPrimitive
     image: String,
 }
 
+static COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+fn counter_increment() -> usize {
+    COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+}
+
 
 impl shader::Primitive for SimpleShaderProgramPrimitive
 {
@@ -41,18 +46,20 @@ impl shader::Primitive for SimpleShaderProgramPrimitive
         queue: &wgpu::Queue,
         format: wgpu::TextureFormat,
         storage: &mut shader::Storage,
-        // 这里的 bound 是 logical size
         bounds: &Rectangle,
         viewport: &Viewport,
     ) {
+        dbg!(bounds);
         if !storage.has::<Pipeline>() {
             storage.store(Pipeline::new(device, queue, format));
         }
 
         let pipeline = storage.get_mut::<Pipeline>().unwrap();
 
+        let position = bounds.position() * viewport.projection();
+
         // Upload data to GPU
-        pipeline.update(device, queue, self.image.as_str());
+        pipeline.update(device, queue, self.image.as_str(), position);
     }
 
     fn render(
@@ -60,7 +67,6 @@ impl shader::Primitive for SimpleShaderProgramPrimitive
         encoder: &mut wgpu::CommandEncoder,
         storage: &shader::Storage,
         target: &wgpu::TextureView,
-        // 这里的 clip_bounds 是 physical size
         clip_bounds: &Rectangle<u32>,
     ) {
         // At this point our pipeline should always be initialized
@@ -76,40 +82,12 @@ struct Pipeline {
     bind_group_layout: wgpu::BindGroupLayout,
     bind_group: Option<wgpu::BindGroup>,
     render_pipeline: wgpu::RenderPipeline,
-    index_buffer: wgpu::Buffer,
-    vertex_buffer: wgpu::Buffer
+    index_buffer: Option<wgpu::Buffer>,
+    vertex_buffer: Option<wgpu::Buffer>
 }
 
 impl Pipeline {
     fn new(device: &wgpu::Device, queue: &wgpu::Queue, _format: wgpu::TextureFormat) -> Self {
-        // Vertex data for a quad (4 vertices)
-        let vertices: [Vertex; 4] = [
-            Vertex::new([-1.0, -1.0], [0.0, 1.0]), // bottom-left
-            Vertex::new([1.0, -1.0], [1.0, 1.0]),  // bottom-right
-            Vertex::new([1.0, 1.0], [1.0, 0.0]),   // top-right
-            Vertex::new([-1.0, 1.0], [0.0, 0.0]),  // top-left
-        ];
-
-        // Create a vertex buffer
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(&vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-
-        // Index data (6 indices for 2 triangles forming a quad)
-        let indices: [u16; 6] = [
-            0, 1, 2,  // First triangle (bottom-left, bottom-right, top-right)
-            0, 2, 3,  // Second triangle (bottom-left, top-right, top-left)
-        ];
-
-        // Create an index buffer
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(&indices),
-            usage: wgpu::BufferUsages::INDEX,
-        });
-
         let vertex_buffer_layout = wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
@@ -192,16 +170,20 @@ impl Pipeline {
             cache: None,
         });
 
+        // let encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        //     label: Some("simple shader program encoder"),
+        // });
+
         Self {
             render_pipeline,
             bind_group_layout,
-            index_buffer,
-            vertex_buffer,
+            index_buffer: None,
+            vertex_buffer: None,
             bind_group: None,
         }
     }
 
-    pub fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, image: &str) {
+    pub fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, image: &str, position: Point) {
         use image::GenericImageView;
 
         // Load the image data in to texture
@@ -282,7 +264,39 @@ impl Pipeline {
             label: Some("Bind Group"),
         });
 
+        dbg!(&position);
+
+         // Vertex data for a quad (4 vertices)
+         let vertices: [Vertex; 4] = [
+            Vertex::new([-1.0 , -1.0 + position.y] , [0.0, 1.0]), // bottom-left
+            Vertex::new([1.0 , -1.0 + position.y], [1.0, 1.0]),  // bottom-right
+            Vertex::new([1.0 , 1.0 + position.y], [1.0, 0.0]),   // top-right
+            Vertex::new([-1.0 , 1.0 + position.y], [0.0, 0.0]),  // top-left
+        ];
+
+        // Create a vertex buffer
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(&vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
+        // Index data (6 indices for 2 triangles forming a quad)
+        let indices: [u16; 6] = [
+            0, 1, 2,  // First triangle (bottom-left, bottom-right, top-right)
+            0, 2, 3,  // Second triangle (bottom-left, top-right, top-left)
+        ];
+
+        // Create an index buffer
+        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Index Buffer"),
+            contents: bytemuck::cast_slice(&indices),
+            usage: wgpu::BufferUsages::INDEX,
+        });
+
         self.bind_group = Some(bind_group);
+        self.index_buffer = Some(index_buffer);
+        self.vertex_buffer = Some(vertex_buffer);
     }
 
     pub fn render(&self, encoder: &mut wgpu::CommandEncoder, iced_target: &wgpu::TextureView, clip_bounds: &Rectangle<u32>) {
@@ -302,11 +316,11 @@ impl Pipeline {
             occlusion_query_set: None,
         });
 
-        render_pass.set_scissor_rect(clip_bounds.x, clip_bounds.y, clip_bounds.width, clip_bounds.height);
+        // render_pass.set_scissor_rect(clip_bounds.x, clip_bounds.y, clip_bounds.width, clip_bounds.height);
 
         // Set the vertex buffer and index buffer
-        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        render_pass.set_vertex_buffer(0, self.vertex_buffer.as_ref().unwrap().slice(..));
+        render_pass.set_index_buffer(self.index_buffer.as_ref().unwrap().slice(..), wgpu::IndexFormat::Uint16);
 
         // Set the pipeline and bind group
         render_pass.set_pipeline(&self.render_pipeline);
@@ -328,5 +342,43 @@ struct Vertex {
 impl Vertex {
     fn new(position: [f32; 2], tex_coords: [f32; 2]) -> Self {
         Self { position, tex_coords }
+    }
+}
+
+
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C)]
+pub struct Uniforms {
+    transform: [f32; 16],
+    /// Uniform values must be 256-aligned;
+    /// see: [`wgpu::Limits`] `min_uniform_buffer_offset_alignment`.
+    _padding: [f32; 48],
+}
+
+impl Uniforms {
+    pub fn new(transform: Transformation) -> Self {
+        Self {
+            transform: transform.into(),
+            _padding: [0.0; 48],
+        }
+    }
+
+    pub fn entry() -> wgpu::BindGroupLayoutEntry {
+        wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: true,
+                min_binding_size: wgpu::BufferSize::new(
+                    std::mem::size_of::<Self>() as u64,
+                ),
+            },
+            count: None,
+        }
+    }
+
+    pub fn min_size() -> Option<wgpu::BufferSize> {
+        wgpu::BufferSize::new(std::mem::size_of::<Self>() as u64)
     }
 }

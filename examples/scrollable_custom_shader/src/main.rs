@@ -35,25 +35,25 @@ impl Application {
         let t0 = Element::from(
             shader(SimpleShaderProgram {image: "ice_cube_normal_map".to_owned()})
                 .width(800)
-                .height(800),
+                .height(1000),
         );
         let t1 = Element::from(
             shader(SimpleShaderProgram {image: "tiger".to_owned()})
                 .width(800)
-                .height(800),
+                .height(1000),
         );
-        let t2 = Element::from(
-            shader(SimpleShaderProgram {image: "ice_cube_normal_map".to_owned()})
-                .width(800)
-                .height(800),
-        );
-        let t3 = Element::from(
-            shader(SimpleShaderProgram {image: "tiger".to_owned()})
-                .width(800)
-                .height(800),
-        );
+        // let t2 = Element::from(
+        //     shader(SimpleShaderProgram {image: "ice_cube_normal_map".to_owned()})
+        //         .width(800)
+        //         .height(800),
+        // );
+        // let t3 = Element::from(
+        //     shader(SimpleShaderProgram {image: "tiger".to_owned()})
+        //         .width(800)
+        //         .height(800),
+        // );
 
-        let list = column![t0, t1, t2, t3].spacing(10);
+        let list = column![t0, t1].spacing(10);
         scrollable(list).width(iced::Length::Fill).into()
     }
 }

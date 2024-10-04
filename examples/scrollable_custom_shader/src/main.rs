@@ -44,10 +44,10 @@ impl Application {
             shader(SimpleShaderProgram {image: "ice_cube_normal_map".to_owned()})
                 .width(800)
                 .height(700);
-        // let t1 = 
-        //     shader(SimpleShaderProgram {image: "tiger".to_owned()})
-        //         .width(800)
-        //         .height(700);
+        let t1 = 
+            shader(SimpleShaderProgram {image: "tiger".to_owned()})
+                .width(800)
+                .height(700);
         // let t2 = 
         //     shader(SimpleShaderProgram {image: "ice_cube_normal_map".to_owned()})
         //         .width(800)
@@ -81,10 +81,10 @@ impl Application {
         //     )
         // );
         
-        // let list = scrollable(column![t0])
-        //     .width(iced::Length::Fill);
+        let list = scrollable(column![t0, t1])
+            .width(iced::Length::Fill);
 
-        column![text("I am header"), t0].into()
+        column![text("I am header"), list].into()
     }
 }
 

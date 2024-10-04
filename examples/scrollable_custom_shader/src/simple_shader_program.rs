@@ -48,10 +48,10 @@ impl shader::Primitive for SimpleShaderProgramPrimitive
 
         let pipeline = storage.get_mut::<Pipeline>().unwrap();
 
-        let position = (*bounds) * (viewport.scale_factor() as f32) * viewport.projection();
+        let bounds = (*bounds) * (viewport.scale_factor() as f32);
 
         // Upload data to GPU
-        pipeline.update(device, queue, self.image.as_str(), position, viewport);
+        pipeline.update(device, queue, self.image.as_str(), bounds, viewport);
     }
 
     fn render(
@@ -201,8 +201,6 @@ impl Pipeline {
     }
 
     pub fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, image: &str, bounds: Rectangle,  viewport: &Viewport) {
-        let bind_group = self.create_bind_group(device, image,queue);
-
         let bounds = bounds * viewport.projection();
 
         let top_left = [bounds.x, bounds.y];
@@ -211,7 +209,7 @@ impl Pipeline {
         let bottom_right = [bounds.x + bounds.width, bounds.y + bounds.height];
 
          // Vertex data for a quad (4 vertices)
-         let vertices: [Vertex; 4] = [
+        let vertices: [Vertex; 4] = [
             Vertex::new(bottom_left , [0.0, 1.0]), // bottom-left
             Vertex::new(bottom_right, [1.0, 1.0]),  // bottom-right
             Vertex::new(top_right, [1.0, 0.0]),   // top-right
@@ -225,7 +223,12 @@ impl Pipeline {
             usage: wgpu::BufferUsages::VERTEX,
         });
 
-        self.cache.insert(image.to_owned(), (bind_group, vertex_buffer));
+        if let std::collections::hash_map::Entry::Occupied(mut entry) = self.cache.entry(image.to_owned()) {
+            entry.get_mut().1 = vertex_buffer;
+        } else {
+            let bind_group = self.create_bind_group(device, image, queue);
+            self.cache.insert(image.to_owned(),(bind_group, vertex_buffer));
+        }
     }
 
     pub fn render(&self, id: &str, encoder: &mut wgpu::CommandEncoder, iced_target: &wgpu::TextureView, clip_bounds: &Rectangle<u32>) {

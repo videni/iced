@@ -6,8 +6,9 @@ edition = "2021"
 
 [dependencies]
 iced.workspace = true
-iced.features = ["debug", "advanced"]
+iced.features = ["debug", "advanced", "image"]
 
 image.workspace = true
 bytemuck.workspace = true
 glam.workspace = true
+rustc-hash = "2.0.0"

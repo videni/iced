@@ -51,7 +51,7 @@ impl shader::Primitive for SimpleShaderProgramPrimitive
         let position = (*bounds) * (viewport.scale_factor() as f32) * viewport.projection();
 
         // Upload data to GPU
-        pipeline.update(device, queue, self.image.as_str(), position);
+        pipeline.update(device, queue, self.image.as_str(), position, viewport);
     }
 
     fn render(
@@ -65,17 +65,18 @@ impl shader::Primitive for SimpleShaderProgramPrimitive
         let pipeline = storage.get::<Pipeline>().unwrap();
 
         // Render primitive
-        pipeline.render(encoder, target, clip_bounds);
+        pipeline.render(self.image.as_str(), encoder, target, clip_bounds);
     }
 }
 
+use rustc_hash::FxHashMap;
 
 struct Pipeline {
     bind_group_layout: wgpu::BindGroupLayout,
-    bind_group: Option<wgpu::BindGroup>,
     render_pipeline: wgpu::RenderPipeline,
     index_buffer: wgpu::Buffer,
-    vertex_buffer: Option<wgpu::Buffer>
+    cache: FxHashMap<String, (wgpu::BindGroup, wgpu::Buffer)>,
+    sampler: wgpu::Sampler,
 }
 
 impl Pipeline {
@@ -179,16 +180,90 @@ impl Pipeline {
             usage: wgpu::BufferUsages::INDEX,
         });
 
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Texture Sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
+
         Self {
             render_pipeline,
             bind_group_layout,
             index_buffer,
-            vertex_buffer: None,
-            bind_group: None,
+            sampler,
+            cache: FxHashMap::default(),
         }
     }
 
-    pub fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, image: &str, position: Rectangle) {
+    pub fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, image: &str, bounds: Rectangle,  viewport: &Viewport) {
+        let bind_group = self.create_bind_group(device, image,queue);
+
+        let bounds = bounds * viewport.projection();
+
+        let top_left = [bounds.x, bounds.y];
+        let top_right = [bounds.x + bounds.width, bounds.y];
+        let bottom_left = [bounds.x, bounds.y + bounds.height];
+        let bottom_right = [bounds.x + bounds.width, bounds.y + bounds.height];
+
+         // Vertex data for a quad (4 vertices)
+         let vertices: [Vertex; 4] = [
+            Vertex::new(bottom_left , [0.0, 1.0]), // bottom-left
+            Vertex::new(bottom_right, [1.0, 1.0]),  // bottom-right
+            Vertex::new(top_right, [1.0, 0.0]),   // top-right
+            Vertex::new(top_left, [0.0, 0.0]),  // top-left
+        ];
+
+        // Create a vertex buffer
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(&vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
+        self.cache.insert(image.to_owned(), (bind_group, vertex_buffer));
+    }
+
+    pub fn render(&self, id: &str, encoder: &mut wgpu::CommandEncoder, iced_target: &wgpu::TextureView, clip_bounds: &Rectangle<u32>) {
+        dbg!("rendering", id, clip_bounds);
+
+        let (bind_group, vertex_buffer) = self.cache.get(id).unwrap();
+
+        // Begin a new render pass
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: iced_target,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            label: Some("Render Pass"),
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
+
+        render_pass.set_scissor_rect(clip_bounds.x, clip_bounds.y, clip_bounds.width, clip_bounds.height);
+
+        // Set the vertex buffer and index buffer
+        render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+        render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+
+        // Set the pipeline and bind group
+        render_pass.set_pipeline(&self.render_pipeline);
+        render_pass.set_bind_group(0, bind_group, &[]);
+
+        // Draw indexed: 6 indices (two triangles), 1 instance
+        render_pass.draw_indexed(0..6, 0, 0..1);
+    }
+
+    fn create_bind_group(&mut self, device: &wgpu::Device, image: &str, queue: &wgpu::Queue) -> wgpu::BindGroup {
         use image::GenericImageView;
 
         // Load the image data in to texture
@@ -241,20 +316,9 @@ impl Pipeline {
         );
         
         let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("Texture Sampler"),
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            ..Default::default()
-        });
-
+     
         // Create the bind group
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+         device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &self.bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
@@ -263,65 +327,11 @@ impl Pipeline {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&sampler),
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
                 },
             ],
             label: Some("Bind Group"),
-        });
-
-        let top_left = [position.x, position.y];
-        let top_right = [position.x + position.width, position.y];
-        let bottom_left = [position.x, position.y + position.height];
-        let bottom_right = [position.x + position.width, position.y + position.height];
-
-         // Vertex data for a quad (4 vertices)
-        let vertices: [Vertex; 4] = [
-            Vertex::new(bottom_left , [0.0, 1.0]), // bottom-left
-            Vertex::new(bottom_right, [1.0, 1.0]),  // bottom-right
-            Vertex::new(top_right, [1.0, 0.0]),   // top-right
-            Vertex::new(top_left, [0.0, 0.0]),  // top-left
-        ];
-
-        // Create a vertex buffer
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(&vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-
-        self.bind_group = Some(bind_group);
-        self.vertex_buffer = Some(vertex_buffer);
-    }
-
-    pub fn render(&self, encoder: &mut wgpu::CommandEncoder, iced_target: &wgpu::TextureView, clip_bounds: &Rectangle<u32>) {
-        // Begin a new render pass
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: iced_target,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            label: Some("Render Pass"),
-            timestamp_writes: None,
-            occlusion_query_set: None,
-        });
-
-        render_pass.set_scissor_rect(clip_bounds.x, clip_bounds.y, clip_bounds.width, clip_bounds.height);
-
-        // Set the vertex buffer and index buffer
-        render_pass.set_vertex_buffer(0, self.vertex_buffer.as_ref().unwrap().slice(..));
-        render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-
-        // Set the pipeline and bind group
-        render_pass.set_pipeline(&self.render_pipeline);
-        render_pass.set_bind_group(0, self.bind_group.as_ref().unwrap(), &[]);
-
-        // Draw indexed: 6 indices (two triangles), 1 instance
-        render_pass.draw_indexed(0..6, 0, 0..1);
+        })
     }
 }
 

@@ -43,11 +43,11 @@ impl Application {
         let t0 = 
             shader(SimpleShaderProgram {image: "ice_cube_normal_map".to_owned()})
                 .width(800)
-                .height(700);
+                .height(1000);
         let t1 = 
             shader(SimpleShaderProgram {image: "tiger".to_owned()})
                 .width(800)
-                .height(700);
+                .height(1000);
         // let t2 = 
         //     shader(SimpleShaderProgram {image: "ice_cube_normal_map".to_owned()})
         //         .width(800)

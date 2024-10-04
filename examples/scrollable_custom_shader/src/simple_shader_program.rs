@@ -48,6 +48,8 @@ impl shader::Primitive for SimpleShaderProgramPrimitive
 
         let pipeline = storage.get_mut::<Pipeline>().unwrap();
 
+        dbg!("SimpleShaderProgramPrimitive-prepare", self.image.as_str(),  bounds);
+
         let bounds = (*bounds) * (viewport.scale_factor() as f32);
 
         // Upload data to GPU

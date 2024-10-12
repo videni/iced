@@ -5,7 +5,9 @@ use futures::channel::mpsc;
 use futures::sink::{Sink, SinkExt};
 use rustc_hash::FxHashMap;
 
+use std::any::type_name;
 use std::hash::Hasher as _;
+use std::process::exit;
 
 /// A registry of subscription streams.
 ///
@@ -70,6 +72,30 @@ impl Tracker {
         let mut futures: Vec<BoxFuture<()>> = Vec::new();
         let mut alive = std::collections::HashSet::new();
 
+        fn type_name_of<T>(_: &T) -> &'static str {
+            std::any::type_name::<T>()
+        }
+
+        // use std::hash::Hash;
+
+        // fn hash_string(s: String) -> u64 {
+        //     let mut hasher = Hasher::default();
+        //     s.hash(&mut hasher);
+        //     hasher.finish()
+        // }
+        
+        //     let string1 = String::from("hello");
+        //     let string2 = String::from("hello");
+        
+        //     let hash1 = hash_string(string1);
+        //     let hash2 = hash_string(string2);
+        
+        //     println!("Hash of '{}'", hash1);
+        //     println!("Hash of '{}'", hash2);
+        
+        //     assert_eq!(hash1, hash2, "Hashes should be the same for the same input");
+
+        // exit(0);
         for recipe in recipes {
             let id = {
                 let mut hasher = Hasher::default();
@@ -77,6 +103,7 @@ impl Tracker {
 
                 hasher.finish()
             };
+            // dbg!(type_name_of(&recipe), id, self.subscriptions.contains_key(&id));
 
             let _ = alive.insert(id);
 

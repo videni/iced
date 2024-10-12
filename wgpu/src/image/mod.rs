@@ -378,6 +378,7 @@ impl Layer {
         transformation: Transformation,
         scale_factor: f32,
     ) {
+
         let uniforms = Uniforms {
             transform: transformation.into(),
             scale_factor,
@@ -397,6 +398,8 @@ impl Layer {
 
         self.nearest
             .upload(device, encoder, belt, nearest_instances);
+
+        // dbg!("Image-layer-prepare", transformation, linear_instances);
 
         self.linear.upload(device, encoder, belt, linear_instances);
     }

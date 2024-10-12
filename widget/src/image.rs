@@ -264,6 +264,8 @@ where
         _cursor: mouse::Cursor,
         _viewport: &Rectangle,
     ) {
+        dbg!("image-draw", self.opacity, layout, _viewport);
+
         draw(
             renderer,
             layout,

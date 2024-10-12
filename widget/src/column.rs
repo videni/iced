@@ -334,6 +334,7 @@ where
         cursor: mouse::Cursor,
         viewport: &Rectangle,
     ) {
+        // dbg!("column-draw", &layout, viewport);
         if let Some(clipped_viewport) = layout.bounds().intersection(viewport) {
             let viewport = if self.clip {
                 &clipped_viewport

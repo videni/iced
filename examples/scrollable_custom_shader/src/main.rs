@@ -82,7 +82,8 @@ impl Application {
         // );
         
         let list = scrollable(column![t0, t1])
-            .width(iced::Length::Fill);
+            .width(800)
+            .height(800);
 
         column![text("I am header"), list].into()
     }

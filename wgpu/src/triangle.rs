@@ -496,6 +496,8 @@ impl Layer {
         transformation: Transformation,
         render_pass: &mut wgpu::RenderPass<'a>,
     ) {
+        // panic!("triangle-layer-render");
+
         let mut num_solids = 0;
         let mut num_gradients = 0;
         let mut last_is_solid = None;

@@ -468,14 +468,14 @@ where
                     &child_limits,
                 );
 
-                // dbg!( &t);
+                // dbg!("child", &t);
 
                 t
 
             },
         );
 
-        // dbg!(&t);
+    //     dbg!(&t);
     // std::process::exit(1);
 
         t
@@ -964,12 +964,18 @@ where
         container::draw_background(renderer, &style.container, layout.bounds());
 
         // std::process::exit(1);
+        // dbg!("Scrollable-draw", visible_bounds, translation, bounds);
         // Draw inner content
         if scrollbars.active() {
             renderer.with_layer(visible_bounds, |renderer| {
                 renderer.with_translation(
                     Vector::new(-translation.x, -translation.y),
                     |renderer| {
+                        // dbg!(content_layout, Rectangle {
+                        //     y: bounds.y + translation.y,
+                        //     x: bounds.x + translation.x,
+                        //     ..bounds
+                        // });
                         self.content.as_widget().draw(
                             &tree.children[0],
                             renderer,

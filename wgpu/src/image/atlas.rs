@@ -40,7 +40,7 @@ impl Atlas {
             _ => vec![Layer::Empty],
         };
 
-        let extent = wgpu::Extent3d {
+        let extent: wgpu::Extent3d = wgpu::Extent3d {
             width: SIZE,
             height: SIZE,
             depth_or_array_layers: layers.len() as u32,

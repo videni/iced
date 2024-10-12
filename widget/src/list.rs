@@ -72,14 +72,6 @@ enum Task {
     },
 }
 
-use std::sync::atomic::AtomicUsize;
-
-static COUNTER: AtomicUsize = AtomicUsize::new(0);
-
-fn increment_counter() {
-    let _ = COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-}
-
 impl State {
     fn recompute(&mut self, size: usize) {
         let mut offsets = Vec::with_capacity(size + 1);
@@ -148,8 +140,6 @@ where
         match state.task {
             Task::Idle => {
                 while let Some(change) = changes.pop_front() {
-                    panic!("hi");
-
                     match change {
                         // original 与 current 的关系是什么？
                         Change::Updated { original, current } => {
@@ -374,8 +364,6 @@ where
 
         let size =
             limits.resolve(Length::Shrink, Length::Shrink, intrinsic_size);
-
-        dbg!(&COUNTER, size);
 
         layout::Node::new(size)
     }

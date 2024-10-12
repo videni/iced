@@ -170,6 +170,7 @@ impl Renderer {
             }
 
             if !layer.primitives.is_empty() {
+                // dbg!("Renderer-prepare", layer.primitives.len());
                 for instance in &layer.primitives {
                     instance.primitive.prepare(
                         device,
@@ -324,8 +325,13 @@ impl Renderer {
 
             if !layer.primitives.is_empty() {
                 let _ = ManuallyDrop::into_inner(render_pass);
-
+                // dbg!("Renderer-render");
+                
                 for instance in &layer.primitives {
+                    // dbg!("next", instance.bounds, instance.bounds * scale, physical_bounds, 
+                    //     (instance.bounds * scale)
+                    // .intersection(&physical_bounds));
+
                     if let Some(clip_bounds) = (instance.bounds * scale)
                         .intersection(&physical_bounds)
                         .and_then(Rectangle::snap)
@@ -530,6 +536,7 @@ impl core::image::Renderer for Renderer {
 
     fn draw_image(&mut self, image: core::Image, bounds: Rectangle) {
         let (layer, transformation) = self.layers.current_mut();
+        
         layer.draw_raster(image, bounds, transformation);
     }
 }
@@ -601,6 +608,7 @@ impl graphics::geometry::Renderer for Renderer {
 impl primitive::Renderer for Renderer {
     fn draw_primitive(&mut self, bounds: Rectangle, primitive: impl Primitive) {
         let (layer, transformation) = self.layers.current_mut();
+
         layer.draw_primitive(bounds, Box::new(primitive), transformation);
     }
 }

@@ -224,7 +224,9 @@ impl Layer {
         primitive: Box<dyn Primitive>,
         transformation: Transformation,
     ) {
+        // dbg!(bounds);
         let bounds = bounds * transformation;
+        // dbg!(transformation, bounds);
 
         self.primitives
             .push(primitive::Instance { bounds, primitive });

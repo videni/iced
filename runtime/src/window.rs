@@ -42,8 +42,8 @@ pub enum Action {
     /// Resize the window to the given logical dimensions.
     Resize(Id, Size),
 
-    /// Get the current logical dimensions of the window.
-    GetSize(Id, oneshot::Sender<Size>),
+    /// Get the current physical and logical dimensions of the window.
+    GetSize(Id, oneshot::Sender<(Size<u32>, Size)>),
 
     /// Get if the current window is maximized or not.
     GetMaximized(Id, oneshot::Sender<bool>),
@@ -270,7 +270,7 @@ pub fn resize<T>(id: Id, new_size: Size) -> Task<T> {
 }
 
 /// Get the window's size in logical dimensions.
-pub fn get_size(id: Id) -> Task<Size> {
+pub fn get_size(id: Id) -> Task<(Size<u32>, Size)> {
     task::oneshot(move |channel| {
         crate::Action::Window(Action::GetSize(id, channel))
     })

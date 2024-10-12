@@ -1298,12 +1298,14 @@ fn run_action<P, C>(
             }
             window::Action::GetSize(id, channel) => {
                 if let Some(window) = window_manager.get_mut(id) {
-                    let size = window
+                    let physical_size = window
                         .raw
-                        .inner_size()
+                        .inner_size();
+
+                    let size = physical_size
                         .to_logical(window.raw.scale_factor());
 
-                    let _ = channel.send(Size::new(size.width, size.height));
+                    let _ = channel.send((Size::new(physical_size.width, physical_size.height), Size::new(size.width, size.height)));
                 }
             }
             window::Action::GetMaximized(id, channel) => {
@@ -1533,7 +1535,6 @@ where
         .drain()
         .filter_map(|(id, cache)| {
             let window = window_manager.get_mut(id)?;
-
             Some((
                 id,
                 build_user_interface(

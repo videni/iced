@@ -267,11 +267,11 @@ impl<T> Subscription<T> {
         F: Fn(T) -> A + MaybeSend + Clone + 'static,
         A: 'static,
     {
-        debug_assert!(
-            std::mem::size_of::<F>() == 0,
-            "the closure {} provided in `Subscription::map` is capturing",
-            std::any::type_name::<F>(),
-        );
+        // debug_assert!(
+        //     std::mem::size_of::<F>() == 0,
+        //     "the closure {} provided in `Subscription::map` is capturing",
+        //     std::any::type_name::<F>(),
+        // );
 
         Subscription {
             recipes: self

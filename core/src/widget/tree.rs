@@ -5,6 +5,8 @@ use std::any::{self, Any};
 use std::borrow::Borrow;
 use std::fmt;
 
+use super::Id;
+
 /// A persistent state widget tree.
 ///
 /// A [`Tree`] is normally associated with a specific widget in the widget tree.
@@ -191,7 +193,12 @@ pub fn diff_children_custom_with_search<T>(
 
 /// The identifier of some widget state.
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Hash)]
-pub struct Tag(any::TypeId);
+pub enum Tag {
+    /// Type id
+    TypeId(any::TypeId),
+    /// Custom id
+    Custom(usize),
+}
 
 impl Tag {
     /// Creates a [`Tag`] for a state of type `T`.
@@ -199,7 +206,7 @@ impl Tag {
     where
         T: 'static,
     {
-        Self(any::TypeId::of::<T>())
+        Self::TypeId(any::TypeId::of::<T>())
     }
 
     /// Creates a [`Tag`] for a stateless widget.

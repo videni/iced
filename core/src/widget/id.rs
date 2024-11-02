@@ -1,5 +1,7 @@
 use std::borrow;
 use std::sync::atomic::{self, AtomicUsize};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
 static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
@@ -20,6 +22,18 @@ impl Id {
         let id = NEXT_ID.fetch_add(1, atomic::Ordering::Relaxed);
 
         Self(Internal::Unique(id))
+    }
+
+    /// Returns the underlying [`usize`] representation of the [`Id`].
+    pub fn as_usize(&self) -> usize {
+        match &self.0 {
+            Internal::Unique(id) => *id,
+            Internal::Custom(id) => {
+                let mut hasher = DefaultHasher::new();
+                id.hash(&mut hasher);
+                hasher.finish() as usize
+            },
+        }
     }
 }
 
